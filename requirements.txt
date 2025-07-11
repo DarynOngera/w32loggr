@@ -1,0 +1,6 @@
+pynput
+psutil
+requests
+pyperclip
+mss
+pywin32

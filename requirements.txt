@@ -4,3 +4,5 @@ requests
 pyperclip
 mss
 pywin32
+cryptography
+pyinstaller

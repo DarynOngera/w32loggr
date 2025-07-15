@@ -168,7 +168,7 @@ def capture_screenshot():
         try:
             with mss() as sct:
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                sct_img = sct.grab(sct.monitors[1])
+                sct_img = sct.grab(sct.monitors[0])
                 img_bytes = mss.tools.to_png(sct_img.rgb, sct_img.size)
                 img_base64 = base64.b64encode(img_bytes).decode('utf-8')
 

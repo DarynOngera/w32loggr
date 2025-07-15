@@ -140,6 +140,14 @@ def log_data(data, client_ip, client_log_dir):
         with open(os.path.join(client_log_dir, 'processes.log'), 'a') as f:
             f.write(log_entry)
             
+    elif log_type == 'network_activity':
+        log_entry = f"[{timestamp}] Network Activity:\n"
+        for conn in data.get('connections', []):
+            log_entry += f"  - PID: {conn.get('pid')}, Process: {conn.get('process_name')}, Local: {conn.get('local_address')}, Remote: {conn.get('remote_address')}, Status: {conn.get('status')}\n"
+        print(log_entry)
+        with open(os.path.join(client_log_dir, 'network_activity.log'), 'a') as f:
+            f.write(log_entry)
+            
     else:
         log_entry = f"[{timestamp}] Unknown data type '{log_type}': {data}"
         print(log_entry)

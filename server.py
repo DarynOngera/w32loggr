@@ -148,6 +148,14 @@ def log_data(data, client_ip, client_log_dir):
         with open(os.path.join(client_log_dir, 'network_activity.log'), 'a') as f:
             f.write(log_entry)
             
+    elif log_type == 'browser_history':
+        log_entry = f"[{timestamp}] Browser History:\n"
+        for entry in data.get('history', []):
+            log_entry += f"  - Browser: {entry.get('browser')}, URL: {entry.get('url')}, Title: {entry.get('title')}, Timestamp: {entry.get('timestamp')}\n"
+        print(log_entry)
+        with open(os.path.join(client_log_dir, 'browser_history.log'), 'a') as f:
+            f.write(log_entry)
+            
     else:
         log_entry = f"[{timestamp}] Unknown data type '{log_type}': {data}"
         print(log_entry)

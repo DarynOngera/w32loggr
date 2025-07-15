@@ -91,4 +91,4 @@ Contributions are welcome! Please feel free to submit pull requests or open issu
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details. (Note: A LICENSE file is not provided in the initial context, consider adding one.)
+This project is licensed under the MIT License - see the LICENSE file for details.

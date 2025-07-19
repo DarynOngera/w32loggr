@@ -16,8 +16,8 @@ To set up the project, follow these steps:
 1.  **Clone the repository**:
 
     ```bash
-    git clone https://github.com/your-username/windows_keylogger.git
-    cd windows_keylogger
+    git clone https://github.com/DarynOngera/w32loggr.git
+    cd w32loggr
     ```
 
 2.  **Create a virtual environment** (recommended):
@@ -91,4 +91,4 @@ Contributions are welcome! Please feel free to submit pull requests or open issu
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details. (Note: A LICENSE file is not provided in the initial context, consider adding one.)
+This project is licensed under the MIT License - see the LICENSE file for details.

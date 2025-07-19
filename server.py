@@ -73,21 +73,25 @@ def handle_client(conn, addr):
 
         buffer = b''
         while True:
-            while b'\n' in buffer:
-                message, buffer = buffer.split(b'\n', 1)
-                if not message:
-                    continue
-                try:
-                    decrypted_message = fernet.decrypt(message)
-                    message_json = json.loads(decrypted_message.decode('utf-8'))
-                    log_data(message_json, client_ip, client_log_dir)
-                except Exception as e:
-                    print(f"[!] Error processing message: {e}")
-            
-            data = conn.recv(4096)
-            if not data:
+            try:
+                data = conn.recv(4096 * 1024) # Increased buffer size
+                if not data:
+                    break
+                buffer += data
+
+                while b'\n' in buffer:
+                    message, buffer = buffer.split(b'\n', 1)
+                    if not message:
+                        continue
+                    try:
+                        decrypted_message = fernet.decrypt(message)
+                        message_json = json.loads(decrypted_message.decode('utf-8'))
+                        log_data(message_json, client_ip, client_log_dir)
+                    except Exception as e:
+                        print(f"[!] Error processing message: {e}")
+            except (ConnectionResetError, socket.timeout):
+                print(f"[-] Connection from {client_ip} lost.")
                 break
-            buffer += data
 
     except ConnectionResetError:
         print(f"[-] Connection from {client_ip} lost.")

